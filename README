@@ -1,0 +1,19 @@
+DsoQuadPlayer:
+University project for Técnicas Digitales I, UTN - FRBA.
+
+The project consists in using oscilloscope DSO 203 [1], to record samples on analog channels, and play these in wave out channel.
+
+FPGA side: ICE65LO4F
+ * Record samples on analog channels.
+ * Store samples on the FPGA implementing a FIFO memory.
+ * When required send samples to the STM32 micro using the bus FSMC.
+ * Maybe implement some digital filter..
+
+NOTE: The control of recording, save memory, erase memory, etc. will be done using the PIO pins that are free.
+
+STM32 side: STM32F103V
+ * This is a VHDL project therefore will be used high-level language to interact with the screen and play the samples obtained with the BUS.  Particularly QuadPawn [2], which has an Pawn interpreter for use on this device.
+
+Links:
+[1] http://www.seeedstudio.com/wiki/DSO_Quad
+[2] https://github.com/PetteriAimonen/QuadPawn

@@ -1,0 +1,5 @@
+*~
+*.o
+*.cf
+*.amx
+/FPGA/DsoQuadPlayer/DsoQuadPlayer_Implmnt

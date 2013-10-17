@@ -1,0 +1,136 @@
+#include <fpga>
+#include <console>
+
+#define FPGA_IMAGE "fpga_top_bitmap.bin"
+
+fpga_reset()
+{
+	// PB1 is our reset pin, toggle it low to reset the FPGA
+	fpga_config_outputs(PB1);
+
+	fpga_clear_pin(PB1);
+	fpga_set_pin(PB1);
+}
+
+bool: fpga_initialize()
+{
+	while (!f_exists(FPGA_IMAGE)) {
+		if (show_dialog("Please copy " ... FPGA_IMAGE ... " to the USB drive.", "OK", "", "", "Exit") == 3) {
+			return false;
+		}
+	}
+
+	if (!fpga_load(FPGA_IMAGE)) {
+		show_msgbox("Failed to load " ... FPGA_IMAGE ... " to the FPGA!");
+		return false;
+	}
+
+	// Configure FPGA clock at 72 MHz
+	wavein_samplerate (72000000);
+
+	fpga_reset ();
+
+	return true;
+}
+
+main()
+{
+	if (!fpga_initialize())
+		return;
+
+	draw_menubar("Quit", "Rst", "", "");
+
+	draw_text ("FPGA configured successfully.", 200, 200, .fg = green, .center = true);
+	draw_text ("Check 9 bits counter..", 100, 160);
+
+	while (!get_keys(BUTTON1))
+	{
+		if (get_keys(BUTTON2)) {
+			fpga_reset ();
+		}
+
+		if (fpga_read_pins(PB0))
+			draw_text ("1", 100, 80, .bg = black);
+		else
+			draw_text ("0", 100, 80, .bg = black);
+
+		if (fpga_read_pins(PB2))
+			draw_text ("1", 125, 80, .bg = black);
+		else
+			draw_text ("0", 125, 80, .bg = black);
+
+		if (fpga_read_pins(PA2))
+			draw_text ("1", 150, 80, .bg = black);
+		else
+			draw_text ("0", 150, 80, .bg = black);
+
+		if (fpga_read_pins(PA3))
+			draw_text ("1", 175, 80, .bg = black);
+		else
+			draw_text ("0", 175, 80, .bg = black);
+
+		if (fpga_read_pins(PA5))
+			draw_text ("1", 200, 80, .bg = black);
+		else
+			draw_text ("0", 200, 80, .bg = black);
+
+		if (fpga_read_pins(PA6))
+			draw_text ("1", 225, 80, .bg = black);
+		else
+			draw_text ("0", 225, 80, .bg = black);
+
+		if (fpga_read_pins(PA7))
+			draw_text ("1", 250, 80, .bg = black);
+		else
+			draw_text ("0", 250, 80, .bg = black);
+
+		if (fpga_read_pins(PC4))
+			draw_text ("1", 275, 80, .bg = black);
+		else
+			draw_text ("0", 275, 80, .bg = black);
+
+		if (fpga_read_pins(PC5))
+			draw_text ("1 ", 300, 80, .bg = black);
+		else
+			draw_text ("0 ", 300, 80, .bg = black);
+
+		delay_ms(10);
+    }
+}
+
+new const program_icon[] = [
+    0b0000000000000000000000000000000,
+    0b0011111101111100011110001111000,
+    0b0011000001100110110011011001100,
+    0b0011000001100110110000011001100,
+    0b0011111001111100111111011111100,
+    0b0011000001100000110011011001100,
+    0b0011000001100000110011011001100,
+    0b0011000001100000011110011001100,
+    0b0000000000000000000000000000000,
+    0b0000000000000000000000000000000,
+
+    0b0000000000000000000000000000000,
+    0b0001111110000111111000011111100,
+    0b0001000010000100001000010000100,
+    0b0001000010000100001000010000100,
+    0b0001000010000100001000010000100,
+    0b0001000010000100001000010000100,
+    0b1111000011111100001111110000111,
+    0b0000000000000000000000000000000,
+
+    0b0000000000000000000000000000000,
+    0b0001111110111111001111001111110,
+    0b0000011000110000011001100011000,
+    0b0000011000110000011000000011000,
+    0b0000011000111110001111000011000,
+    0b0000011000110000000001100011000,
+    0b0000011000110000011001100011000,
+    0b0000011000111111001111000011000,
+    0b0000000000000000000000000000000,
+    0b0000000000000000000000000000000,
+];
+
+new const program_name{} = "Fpga Test";
+
+#include <metadata>
