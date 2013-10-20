@@ -6,63 +6,63 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 USE ieee.numeric_std.all;
 
-ENTITY fpga_top IS
-	PORT (clk:      in     std_logic;
-	      rst_n:    in     std_logic;
+ENTITY dso_quad_top IS
+	PORT (clk:      IN     STD_LOGIC;
+	      rst_n:    IN     STD_LOGIC;
 
 	      -- Memory bus
-	      fsmc_ce:  in     std_logic;
-	      fsmc_nwr: in     std_logic;
-	      fsmc_nrd: in     std_logic;
-	      fsmc_db:  inout  std_logic_vector(15 downto 0);
+	      fsmc_ce:  IN     STD_LOGIC;
+	      fsmc_nwr: IN     STD_LOGIC;
+	      fsmc_nrd: IN     STD_LOGIC;
+	      fsmc_db:  INOUT  STD_LOGIC_VECTOR(15 DOWNTO 0);
 
 	      -- ADC signals
-	      adc_mode:  in    std_logic;
-	      adc_sleep: out   std_logic;
-	      cha_clk:   out   std_logic;
-	      chb_clk:   out   std_logic;
+	      adc_mode:  IN    STD_LOGIC;
+	      adc_sleep: OUT   STD_LOGIC;
+	      cha_clk:   OUT   STD_LOGIC;
+	      chb_clk:   OUT   STD_LOGIC;
 
 	      -- Oscilloscope data inputs
-	      cha_din:   in    std_logic_vector(7 downto 0);
-	      chb_din:   in    std_logic_vector(7 downto 0);
-	      chc_din:   in    std_logic;
-	      chd_din:   in    std_logic;
+	      cha_din:   IN    STD_LOGIC_VECTOR(7 DOWNTO 0);
+	      chb_din:   IN    STD_LOGIC_VECTOR(7 DOWNTO 0);
+	      chc_din:   IN    STD_LOGIC;
+	      chd_din:   IN    STD_LOGIC;
 
 	      -- General-purpose input/output
-	      PB0:       out   std_logic;
-	      --PB1:       out   std_logic;
-	      PB2:       out   std_logic;
-	      PA2:       out   std_logic;
-	      PA3:       out   std_logic;
-	      PA5:       out   std_logic;
-	      PA6:       out   std_logic;
-	      PA7:       out   std_logic;
-	      PC4:       out   std_logic;
-	      PC5:       out   std_logic);
-END ENTITY;
+	      PB0:       OUT   STD_LOGIC;
+	      --PB1:       OUT   STD_LOGIC;
+	      PB2:       OUT   STD_LOGIC;
+	      PA2:       OUT   STD_LOGIC;
+	      PA3:       OUT   STD_LOGIC;
+	      PA5:       OUT   STD_LOGIC;
+	      PA6:       OUT   STD_LOGIC;
+	      PA7:       OUT   STD_LOGIC;
+	      PC4:       OUT   STD_LOGIC;
+	      PC5:       OUT   STD_LOGIC);
+END dso_quad_top;
 
-ARCHITECTURE behavioral OF fpga_top IS
-	signal counter : unsigned         (26 downto 0); -- 2^26 < 72000000 < 2^27
-	signal temp    : std_logic_vector (8 downto 0);
-	signal cntsec  : unsigned         (8 downto 0);
+ARCHITECTURE Behavior OF dso_quad_top IS
+	SIGNAL counter : UNSIGNED         (26 DOWNTO 0); -- 2^26 < 72000000 < 2^27
+	SIGNAL temp    : STD_LOGIC_VECTOR (8 DOWNTO 0);
+	SIGNAL cntsec  : UNSIGNED         (8 DOWNTO 0);
 	BEGIN
 		PROCESS (clk)
 		BEGIN
-			if (rising_edge(clk)) then
-				if (rst_n = '0') then
-					cntsec  <= (others => '0');
-					counter <= (others => '0');
-				else
+			IF (rising_edge(clk)) THEN
+				IF (rst_n = '0') THEN
+					cntsec  <= (OTHERS => '0');
+					counter <= (OTHERS => '0');
+				ELSE
 					counter <= counter + 1;
-					if (counter = 72000000) then
+					IF (counter = 72000000) THEN
 						cntsec <= cntsec + 1;
-						counter <= (others => '0');
-					end if;
-				end if;
-			end if;
-		END PROCESS;
+						counter <= (OTHERS => '0');
+					END IF;
+				END IF;
+			END IF;
+		END PROCESS;		
 
-		temp <= std_logic_vector (cntsec);
+		temp <= STD_LOGIC_VECTOR (cntsec);
 		PB0 <= temp (8);
 		PB2 <= temp (7);
 		PA2 <= temp (6);
@@ -72,4 +72,4 @@ ARCHITECTURE behavioral OF fpga_top IS
 		PA7 <= temp (2);
 		PC4 <= temp (1);
 		PC5 <= temp (0);
-END ARCHITECTURE;
+END Behavior;
