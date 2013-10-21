@@ -131,7 +131,7 @@ new const program_icon[] = [
     0b0000000000000000000000000000000,
 ];
 
-new const program_name{} = "Fsmc Example";
+new const program_name{} = "Pio Example";
 
 #include <metadata>
 
