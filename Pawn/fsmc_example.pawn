@@ -69,7 +69,7 @@ do_capture ()
 
 	print("# ");
 	for (new i = 0; i < count; i++) {
-		print(str(recv_buffer[i]));
+		print(hex(recv_buffer[i]));
 		print(" ");
 	}
 	print("\n");

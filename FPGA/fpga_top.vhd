@@ -49,10 +49,12 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 
 	-- Basic fsmc example
 	SIGNAL fsmc_want_count  : STD_LOGIC;
+	SIGNAL fsmc_was_read_r  : STD_LOGIC;
 
 	SIGNAL fifo_data_out    : STD_LOGIC_VECTOR(15 downto 0);
 	SIGNAL address          : UNSIGNED (3 DOWNTO 0);
 	SIGNAL fifo_count       : UNSIGNED (3 DOWNTO 0);
+	SIGNAL fifo_read        : STD_LOGIC;
 
 	SIGNAL fsmc_output_data : STD_LOGIC_VECTOR(15 downto 0);
 
@@ -122,7 +124,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 			IF (rising_edge(clk)) THEN
 				IF (rst_n = '0') THEN
 					address <= (OTHERS => '0');
-				ELSE
+				ELSIF (fifo_read = '1') THEN
 					IF (address < 13) THEN
 						address <= address + 1;
 					ELSE
@@ -131,6 +133,17 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 				END IF;
 			END IF;
 		END PROCESS;
+
+		PROCESS (clk, rst_n)
+		BEGIN
+			IF rst_n = '0' THEN
+				fsmc_was_read_r <= '0';
+			ELSIF rising_edge(clk) THEN
+				fsmc_was_read_r <= (NOT(fsmc_nrd) AND fsmc_ce);
+			END IF;
+		END PROCESS;
+
+		fifo_read <= (fsmc_nrd AND fsmc_was_read_r) WHEN (fsmc_want_count = '0') ELSE '0';
 
 		-- Select the info that would go to the port according to address.
 		WITH address SELECT
