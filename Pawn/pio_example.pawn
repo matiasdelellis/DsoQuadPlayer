@@ -1,7 +1,7 @@
 #include <fpga>
 #include <console>
 
-#define FPGA_IMAGE "fpga_top_bitmap.bin"
+#define FPGA_IMAGE "dso_quad.bin"
 
 fpga_reset()
 {
@@ -131,6 +131,7 @@ new const program_icon[] = [
     0b0000000000000000000000000000000,
 ];
 
-new const program_name{} = "Fpga Test";
+new const program_name{} = "Fsmc Example";
 
 #include <metadata>
+

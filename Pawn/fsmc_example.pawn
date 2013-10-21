@@ -1,0 +1,142 @@
+#include <fpga>
+#include <console>
+
+#define FPGA_IMAGE "dso_quad.bin"
+
+/// Set the contents of the LOGIC.FPG FPGA configuration register
+fpga_set_config(value)
+{
+    new buffer[1];
+    buffer[0] = value;
+    fpga_write(buffer);
+}
+
+fpga_reset()
+{
+    // PB1 is our reset pin, toggle it low to reset the FPGA
+    fpga_config_outputs(PB1);
+    fpga_clear_pin(PB1);
+    fpga_set_pin(PB1);
+}
+
+bool: fpga_initialize()
+{
+    while (!f_exists(FPGA_IMAGE))
+    {
+        if (show_dialog("Please copy " ... FPGA_IMAGE ... " to the USB drive.",
+            "OK", "", "", "Exit") == 3)
+        {
+            return false;
+        }
+    }
+
+    if (!fpga_load(FPGA_IMAGE))
+    {
+        show_msgbox("Failed to load " ... FPGA_IMAGE ... " to the FPGA!");
+        return false;
+    }
+
+    // Configure FPGA clock at 72 MHz
+    wavein_samplerate(72000000);
+
+    fpga_reset();
+
+    return true;
+}
+
+new recv_buffer[14];
+
+do_capture ()
+{
+    println("");
+    println("Get de name?");
+
+    fpga_reset ();
+
+	// First read the amount of available data
+	fpga_set_config(0x0001);
+	fpga_read (recv_buffer, 1);
+	new count = recv_buffer[0];
+
+	print("Count: ");
+	println(str(count));
+
+    fpga_reset ();
+
+	// Get the data into our buffer
+	fpga_set_config (0x0000);
+	fpga_read (recv_buffer, count);
+
+	print("# ");
+	for (new i = 0; i < count; i++) {
+		print(str(recv_buffer[i]));
+		print(" ");
+	}
+	print("\n");
+}
+
+main()
+{
+	if (!fpga_initialize())
+		return;
+
+	println("FPGA configured successfully.");
+	println("Ready to capture 4 channels at 72 MSps.");
+
+	get_keys(ANY_KEY);
+
+	while (!get_keys(BUTTON4))
+	{
+		get_keys(ANY_KEY); // Clear key buffer
+		draw_menubar("Start", "", "", "Exit");
+
+		while (!peek_keys(ANY_KEY))
+		{
+			delay_ms(100);
+		}
+
+		if (get_keys(BUTTON1))
+		{
+			draw_menubar("Stop", "", "", "Exit");
+			do_capture();
+		}
+	}
+}
+
+new const program_icon[] = [
+    0b0000000000000000000000000000000,
+    0b0011111101111100011110001111000,
+    0b0011000001100110110011011001100,
+    0b0011000001100110110000011001100,
+    0b0011111001111100111111011111100,
+    0b0011000001100000110011011001100,
+    0b0011000001100000110011011001100,
+    0b0011000001100000011110011001100,
+    0b0000000000000000000000000000000,
+    0b0000000000000000000000000000000,
+
+    0b0000000000000000000000000000000,
+    0b0001111110000111111000011111100,
+    0b0001000010000100001000010000100,
+    0b0001000010000100001000010000100,
+    0b0001000010000100001000010000100,
+    0b0001000010000100001000010000100,
+    0b1111000011111100001111110000111,
+    0b0000000000000000000000000000000,
+
+    0b0000000000000000000000000000000,
+    0b0001111110111111001111001111110,
+    0b0000011000110000011001100011000,
+    0b0000011000110000011000000011000,
+    0b0000011000111110001111000011000,
+    0b0000011000110000000001100011000,
+    0b0000011000110000011001100011000,
+    0b0000011000111111001111000011000,
+    0b0000000000000000000000000000000,
+    0b0000000000000000000000000000000,
+];
+
+new const program_name{} = "Fsmc Example";
+
+#include <metadata>
+
