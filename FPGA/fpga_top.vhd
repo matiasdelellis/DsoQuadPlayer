@@ -7,6 +7,8 @@ USE ieee.std_logic_1164.all;
 USE ieee.numeric_std.all;
 
 ENTITY dso_quad_top IS
+	generic (ram_lenght : INTEGER := 4096);
+
 	PORT (clk:      IN     STD_LOGIC;
 	      rst_n:    IN     STD_LOGIC;
 
@@ -29,8 +31,8 @@ ENTITY dso_quad_top IS
 	      chd_din:   IN    STD_LOGIC;
 
 	      -- General-purpose input/output
-	      PB0:       OUT   STD_LOGIC;
-	      --PB1:       OUT   STD_LOGIC;
+	      PB0:       IN   STD_LOGIC;    -- Fill when PB0 = '0'
+	      --PB1:       OUT   STD_LOGIC; -- Used as reset.
 	      PB2:       OUT   STD_LOGIC;
 	      PA2:       OUT   STD_LOGIC;
 	      PA3:       OUT   STD_LOGIC;
@@ -42,129 +44,127 @@ ENTITY dso_quad_top IS
 END dso_quad_top;
 
 ARCHITECTURE Behavior OF dso_quad_top IS
-	-- 9 bit counter example on PIO
+	-- 8 bit counter example on PIO
 	SIGNAL counter          : UNSIGNED         (26 DOWNTO 0); -- 2^26 < 72000000 < 2^27
-	SIGNAL temp             : STD_LOGIC_VECTOR (8 DOWNTO 0);
-	SIGNAL cntsec           : UNSIGNED         (8 DOWNTO 0);
+	SIGNAL cntsec           : UNSIGNED         (7 DOWNTO 0);
+	SIGNAL temp             : STD_LOGIC_VECTOR (7 DOWNTO 0);
 
-	-- Basic fsmc example
+	-- FSMC Bus
 	SIGNAL fsmc_want_count  : STD_LOGIC;
 	SIGNAL fsmc_was_read_r  : STD_LOGIC;
 
-	SIGNAL fifo_data_out    : STD_LOGIC_VECTOR(15 downto 0);
-	SIGNAL address          : UNSIGNED (3 DOWNTO 0);
-	SIGNAL fifo_count       : UNSIGNED (3 DOWNTO 0);
-	SIGNAL fifo_read        : STD_LOGIC;
-
 	SIGNAL fsmc_output_data : STD_LOGIC_VECTOR(15 downto 0);
+	SIGNAL fsmc_input_data  : STD_LOGIC_VECTOR(15 downto 0);
+	SIGNAL fsmc_nrd_edge    : STD_LOGIC;
+
+	-- Memory
+	TYPE mem_type IS ARRAY (ram_lenght - 1 DOWNTO 0) OF STD_LOGIC_VECTOR (15 downto 0);
+
+	SIGNAL RAM              : mem_type;
+	SIGNAL mem_read         : STD_LOGIC;
+	SIGNAL w_address        : INTEGER RANGE 0 TO ram_lenght - 1;
+	SIGNAL r_address        : INTEGER RANGE 0 TO ram_lenght - 1;
+	SIGNAL l_address        : INTEGER RANGE 0 TO ram_lenght - 1;
+	SIGNAL w_data           : STD_LOGIC_VECTOR(15 downto 0);
+	SIGNAL r_data           : STD_LOGIC_VECTOR(15 downto 0);
+	SIGNAL d_count          : STD_LOGIC_VECTOR(15 downto 0);
 
 	BEGIN
-		-------------------------------
-		-- Fix floating pin warnings --
-		-------------------------------
-		adc_sleep <= '1';
-		cha_clk   <= '0';
-		chb_clk   <= '0';
+		--------------------------------
+		-- Chanel A and B with Memory --
+		--------------------------------
 
-		-----------------
-		-- PIO example --
-		-----------------
+		adc_sleep <= '1';
+		cha_clk   <= clk;
+		chb_clk   <= clk;
+
+		-- Write process.
+		w_data <= chb_din & cha_din;
+
  		PROCESS (clk)
  		BEGIN
- 			IF (rising_edge(clk)) THEN
- 				IF (rst_n = '0') THEN
-					cntsec  <= (OTHERS => '0');
-					counter <= (OTHERS => '0');
+ 			IF rising_edge(clk) THEN
+ 				IF rst_n = '0' THEN
+ 					w_address <= 0;
  				ELSE
-					counter <= counter + 1;
-					IF (counter = 72000000) THEN
-						cntsec <= cntsec + 1;
-						counter <= (OTHERS => '0');
- 					END IF;
+ 					IF PB0 = '1' THEN
+ 						IF w_address < ram_lenght - 1 THEN
+	 						w_address <= w_address + 1;
+	 						RAM(w_address) <= w_data;
+	 					END IF;
+					END IF;
  				END IF;
  			END IF;
-		END PROCESS;		
+		END PROCESS;
 
-		temp <= STD_LOGIC_VECTOR (cntsec);
-		PB0 <= temp (8);
-		PB2 <= temp (7);
-		PA2 <= temp (6);
-		PA3 <= temp (5);
-		PA5 <= temp (4);
-		PA6 <= temp (3);
-		PA7 <= temp (2);
-		PC4 <= temp (1);
-		PC5 <= temp (0);
+		-- Infer a lach to save last write address.
+ 		PROCESS (clk)
+ 		BEGIN
+ 			IF rising_edge(clk) THEN
+ 				IF (rst_n = '0') THEN
+					l_address <= 0;
+ 				ELSE
+ 					IF PB0 = '1' THEN
+						l_address <= w_address;
+					END IF;
+ 				END IF;
+ 			END IF;
+		END PROCESS;
+		d_count <= STD_LOGIC_VECTOR (to_unsigned(l_address, 16));
+
+		-- Read process.
+		PROCESS (clk)
+		BEGIN
+			IF rising_edge(clk) THEN
+				IF rst_n = '0' THEN
+					r_address <= 0;
+				ELSIF mem_read = '1' THEN
+					IF r_address < l_address THEN
+						r_address <= r_address + 1;
+					END IF;
+				END IF;
+			END IF;
+		END PROCESS;
+		r_data <= RAM(r_address);
+		mem_read <= fsmc_nrd_edge WHEN (fsmc_want_count = '0') ELSE '0';
 
 		-------------------
 		-- FSMC example. --
 		-------------------
 
-		fifo_count <= to_unsigned(14, fifo_count'length);  -- Fixed as "MATIASDELELLIS" lenght.
-
-		-- Process to read fsmc from micro.
-		-- Read on rising_edge(clk), when fsmc_ce = '1' AND fsmc_nwr = '0'
-		-- Used only to detect when micro want the fifo width.
+		-- Micro write Bus on clock when fsmc_ce = '1' AND fsmc_nwr = '0'
+		-- Only used to know when micro want count or mem data.
 		PROCESS (clk, rst_n)
 		BEGIN
 			IF rst_n = '0' THEN
-				fsmc_want_count <= '0';
+				fsmc_input_data <= (OTHERS => '0');
 			ELSIF rising_edge(clk) THEN
 				IF fsmc_ce = '1' AND fsmc_nwr = '0' THEN
-					fsmc_want_count <= fsmc_db (0);
+					fsmc_input_data <= fsmc_db;
 				END IF;
 			END IF;
 		END PROCESS;
+		fsmc_want_count <= '1' WHEN fsmc_input_data = X"0001" ELSE '0';
 
-		-- Process to configure the address to read on fifo.
-		-- Change the pointer when rising_edge(clk).
-		-- TODO: Change on any rising_edge(). When have to progress?.
-		PROCESS (clk)
-		BEGIN
-			IF (rising_edge(clk)) THEN
-				IF (rst_n = '0') THEN
-					address <= (OTHERS => '0');
-				ELSIF (fifo_read = '1') THEN
-					IF (address < 13) THEN
-						address <= address + 1;
-					ELSE
-						address <= (OTHERS => '0');
-					END IF;
-				END IF;
-			END IF;
-		END PROCESS;
-
+		-- Micro read Bus on clock when fsmc_ce = '1' AND fsmc_nwr = '0'
 		PROCESS (clk, rst_n)
 		BEGIN
 			IF rst_n = '0' THEN
 				fsmc_was_read_r <= '0';
 			ELSIF rising_edge(clk) THEN
-				fsmc_was_read_r <= (NOT(fsmc_nrd) AND fsmc_ce);
+				IF fsmc_ce = '1' AND fsmc_nrd = '0' THEN
+					fsmc_was_read_r <= '1';
+				ELSE
+					fsmc_was_read_r <= '0';
+				END IF;
 			END IF;
 		END PROCESS;
+		fsmc_nrd_edge <= '1' WHEN fsmc_nrd = '1' AND fsmc_was_read_r = '1' ELSE '0';
 
-		fifo_read <= (fsmc_nrd AND fsmc_was_read_r) WHEN (fsmc_want_count = '0') ELSE '0';
-
-		-- Select the info that would go to the port according to address.
-		WITH address SELECT
-			fifo_data_out <= X"0077" WHEN "0000", -- M
-			                 X"0065" WHEN "0001", -- A
-			                 X"0084" WHEN "0010", -- T
-			                 X"0073" WHEN "0011", -- I
-			                 X"0065" WHEN "0100", -- A
-			                 X"0083" WHEN "0101", -- S
-			                 X"0068" WHEN "0110", -- D
-			                 X"0069" WHEN "0111", -- E
-			                 X"0076" WHEN "1000", -- L
-			                 X"0069" WHEN "1001", -- E
-			                 X"0076" WHEN "1010", -- L
-			                 X"0076" WHEN "1011", -- L
-			                 X"0073" WHEN "1100", -- I
-			                 X"0083" WHEN OTHERS; -- S
-
-		-- Select between the information on the fifo, and their size.
-		fsmc_output_data <= fifo_data_out WHEN (fsmc_want_count = '0') ELSE "000000000000" & STD_LOGIC_VECTOR (fifo_count);
+		-- Select between the ram data, and their mem size.
+		fsmc_output_data <= r_data WHEN fsmc_want_count = '0' ELSE d_count;
 
 		-- Write data on fsmc when fsmc_nrd = '0' and fsmc_ce = '1'. If not, put high impedance to read.
+		-- fsmc_db <= fsmc_output_data WHEN fsmc_was_read_r = '1' ELSE (OTHERS => 'Z');
 		fsmc_db <= fsmc_output_data WHEN (fsmc_nrd = '0' AND fsmc_ce = '1') ELSE (OTHERS => 'Z');
 END Behavior;

@@ -3,56 +3,50 @@
 
 #define FPGA_IMAGE "dso_quad.bin"
 
-/// Set the contents of the LOGIC.FPG FPGA configuration register
 fpga_set_config(value)
 {
-    new buffer[1];
-    buffer[0] = value;
-    fpga_write(buffer);
+	new buffer[1];
+	buffer[0] = value;
+
+	fpga_write(buffer);
 }
 
 fpga_reset()
 {
-    // PB1 is our reset pin, toggle it low to reset the FPGA
-    fpga_config_outputs(PB1);
-    fpga_clear_pin(PB1);
-    fpga_set_pin(PB1);
+	fpga_config_outputs(PB1);
+	fpga_clear_pin (PB1); // Reset
+	delay_ms (10);
+	fpga_set_pin (PB1);   // Clean reset
 }
 
 bool: fpga_initialize()
 {
-    while (!f_exists(FPGA_IMAGE))
-    {
-        if (show_dialog("Please copy " ... FPGA_IMAGE ... " to the USB drive.",
-            "OK", "", "", "Exit") == 3)
-        {
-            return false;
-        }
-    }
+	while (!f_exists(FPGA_IMAGE)) {
+		if (show_dialog("Please copy " ... FPGA_IMAGE ... " to the USB drive.", "OK", "", "", "Exit") == 3) {
+			return false;
+		}
+	}
 
-    if (!fpga_load(FPGA_IMAGE))
-    {
-        show_msgbox("Failed to load " ... FPGA_IMAGE ... " to the FPGA!");
-        return false;
-    }
+	if (!fpga_load(FPGA_IMAGE)) {
+		show_msgbox("Failed to load " ... FPGA_IMAGE ... " to the FPGA!");
+		return false;
+	}
 
-    // Configure FPGA clock at 72 MHz
-    wavein_samplerate(72000000);
+	// Configure FPGA clock at 72 MHz
+	wavein_samplerate (72000000);
 
-    fpga_reset();
+	fpga_config_outputs(PB0);
+	fpga_config_outputs(PB1);
 
-    return true;
+	fpga_reset();
+
+	return true;
 }
 
-new recv_buffer[14];
+new recv_buffer[4096];
 
 do_capture ()
 {
-    println("");
-    println("Get de name?");
-
-    fpga_reset ();
-
 	// First read the amount of available data
 	fpga_set_config(0x0001);
 	fpga_read (recv_buffer, 1);
@@ -61,7 +55,13 @@ do_capture ()
 	print("Count: ");
 	println(str(count));
 
-    fpga_reset ();
+	if (!count)
+		return;
+
+	if (count > 4096) {
+		println("Soooo big..");
+		return;
+	}
 
 	// Get the data into our buffer
 	fpga_set_config (0x0000);
@@ -77,27 +77,40 @@ do_capture ()
 
 main()
 {
+	new bool: fill = false;
+
 	if (!fpga_initialize())
 		return;
 
+	draw_menubar("FILL", "RST", "GET", "Exit");
+
 	println("FPGA configured successfully.");
-	println("Ready to capture 4 channels at 72 MSps.");
+	println("Ready to capture channels at 72 MSps.");
 
-	get_keys(ANY_KEY);
+	while (!get_keys(BUTTON4)) {
+		if (held_keys(BUTTON1)) {
+			if (!fill) {
+				fpga_set_pin(PB0);
+				fill = true;
+			}
+			println("Filling");
+		}
+		else {
+			if (fill) {
+				fpga_clear_pin(PB0);
+				fill = false;
 
-	while (!get_keys(BUTTON4))
-	{
-		get_keys(ANY_KEY); // Clear key buffer
-		draw_menubar("Start", "", "", "Exit");
-
-		while (!peek_keys(ANY_KEY))
-		{
-			delay_ms(100);
+				println("Stop Filling");
+			}
 		}
 
-		if (get_keys(BUTTON1))
-		{
-			draw_menubar("Stop", "", "", "Exit");
+		if (get_keys(BUTTON2)) {
+			fpga_reset()
+			println("Reset");
+		}
+
+		if (get_keys(BUTTON3)) {
+			println ("Get");
 			do_capture();
 		}
 	}
