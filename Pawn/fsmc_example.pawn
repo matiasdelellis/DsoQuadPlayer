@@ -46,6 +46,7 @@ new recv_buffer[4096];
 
 do_capture ()
 {
+	new i = 0;
 	new filename{14} = "WAVE%03d.SVG";
 
 	// First read the amount of available data
@@ -71,21 +72,27 @@ do_capture ()
 	fpga_set_config (0x0000);
 	fpga_read (recv_buffer, count);
 
-	f_write(file, "<html><body><svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\">\n");
+	f_write(file, "<html><body><svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\">\r\n");
 
 	f_write(file, "\t<polyline points=\"");
-	for (new i = 0; i < count; i++) {
-		f_write(file, strjoin(str(i), ",", str(recv_buffer[i] & 0x00FF), " "));
+	for (i = 0; i < count; i++) {
+		f_write(file, str(i));
+		f_write(file, ",");
+		f_write(file, str(recv_buffer[i] & 0x00FF));
+		f_write(file, " ");
 	}
-	f_write(file, "\"\n");
-	f_write(file, "\tstyle=\"fill:none;stroke:black;stroke-width:2\" />\n");
+	f_write(file, "\"\r\n");
+	f_write(file, "\tstyle=\"fill:none;stroke:black;stroke-width:2\" />\r\n");
 
 	f_write(file, "\t<polyline points=\"");
-	for (new i = 0; i < count; i++) {
-		f_write(file, strjoin(str(i), ",", str(recv_buffer[i]>>8), " "));
+	for (i = 0; i < count; i++) {
+		f_write(file, str(i));
+		f_write(file, ",");
+		f_write(file, str(recv_buffer[i]>>8));
+		f_write(file, " ");
 	}
-	f_write(file, "\"\n");
-	f_write(file, "\tstyle=\"fill:none;stroke:blue;stroke-width:2\" />\n");
+	f_write(file, "\"\r\n");
+	f_write(file, "\tstyle=\"fill:none;stroke:blue;stroke-width:2\" />\r\n");
 
 	f_write(file, "</svg></body></html>");
 
