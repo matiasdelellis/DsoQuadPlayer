@@ -9,20 +9,20 @@ USE ieee.numeric_std.all;
 ENTITY dso_quad_top IS
 	generic (ram_lenght : INTEGER := 4096);
 
-	PORT (clk:      IN     STD_LOGIC;
-	      rst_n:    IN     STD_LOGIC;
+	PORT (clk:      IN     STD_LOGIC;                      -- Main clock input      -> rising edge
+	      rst_n:    IN     STD_LOGIC;                      -- FIFO status reset     -> Active high
 
 	      -- Memory bus
-	      fsmc_ce:  IN     STD_LOGIC;
-	      fsmc_nwr: IN     STD_LOGIC;
-	      fsmc_nrd: IN     STD_LOGIC;
-	      fsmc_db:  INOUT  STD_LOGIC_VECTOR(15 DOWNTO 0);
+	      fsmc_ce:  IN     STD_LOGIC;                      -- Databus select enable -> Active high
+	      fsmc_nwr: IN     STD_LOGIC;                      -- Databus write enable  -> Active low
+	      fsmc_nrd: IN     STD_LOGIC;                      -- Databus read enable   -> Active low
+	      fsmc_db:  INOUT  STD_LOGIC_VECTOR(15 DOWNTO 0);  -- Data bus to MCU
 
 	      -- ADC signals
-	      adc_mode:  IN    STD_LOGIC;
-	      adc_sleep: OUT   STD_LOGIC;
-	      cha_clk:   OUT   STD_LOGIC;
-	      chb_clk:   OUT   STD_LOGIC;
+	      adc_mode:  IN    STD_LOGIC;                      -- Ignored.
+	      adc_sleep: OUT   STD_LOGIC;                      -- ADC power down        -> Active low
+	      cha_clk:   OUT   STD_LOGIC;                      -- ADC clock channek A   -> rising edge
+	      chb_clk:   OUT   STD_LOGIC;                      -- ADC clock channek B   -> rising edge
 
 	      -- Oscilloscope data inputs
 	      cha_din:   IN    STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -31,8 +31,7 @@ ENTITY dso_quad_top IS
 	      chd_din:   IN    STD_LOGIC;
 
 	      -- General-purpose input/output
-	      PB0:       IN   STD_LOGIC;    -- Fill when PB0 = '0'
-	      --PB1:       OUT   STD_LOGIC; -- Used as reset.
+	      PB0:       IN   STD_LOGIC;                       -- Fill fifo             --> Active low
 	      PB2:       OUT   STD_LOGIC;
 	      PA2:       OUT   STD_LOGIC;
 	      PA3:       OUT   STD_LOGIC;
@@ -44,11 +43,6 @@ ENTITY dso_quad_top IS
 END dso_quad_top;
 
 ARCHITECTURE Behavior OF dso_quad_top IS
-	-- 8 bit counter example on PIO
-	SIGNAL counter          : UNSIGNED         (26 DOWNTO 0); -- 2^26 < 72000000 < 2^27
-	SIGNAL cntsec           : UNSIGNED         (7 DOWNTO 0);
-	SIGNAL temp             : STD_LOGIC_VECTOR (7 DOWNTO 0);
-
 	-- FSMC Bus
 	SIGNAL fsmc_want_count  : STD_LOGIC;
 	SIGNAL fsmc_was_read_r  : STD_LOGIC;
