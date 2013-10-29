@@ -13,7 +13,6 @@ fpga_set_config(value)
 
 fpga_reset()
 {
-	fpga_config_outputs(PB1);
 	fpga_clear_pin (PB1); // Reset
 	delay_ms (10);
 	fpga_set_pin (PB1);   // Clean reset
@@ -47,6 +46,8 @@ new recv_buffer[4096];
 
 do_capture ()
 {
+	new filename{14} = "WAVE%03d.SVG";
+
 	// First read the amount of available data
 	fpga_set_config(0x0001);
 	fpga_read (recv_buffer, 1);
@@ -63,16 +64,35 @@ do_capture ()
 		return;
 	}
 
+	select_filename(filename);
+	new File: file = f_open(filename, FA_WRITE | FA_CREATE_ALWAYS);
+
 	// Get the data into our buffer
 	fpga_set_config (0x0000);
 	fpga_read (recv_buffer, count);
 
-	print("# ");
+	f_write(file, "<html><body><svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\">\n");
+
+	f_write(file, "\t<polyline points=\"");
 	for (new i = 0; i < count; i++) {
-		print(hex(recv_buffer[i]));
-		print(" ");
+		f_write(file, strjoin(str(i), ",", str(recv_buffer[i] & 0x00FF), " "));
 	}
-	print("\n");
+	f_write(file, "\"\n");
+	f_write(file, "\tstyle=\"fill:none;stroke:black;stroke-width:2\" />\n");
+
+	f_write(file, "\t<polyline points=\"");
+	for (new i = 0; i < count; i++) {
+		f_write(file, strjoin(str(i), ",", str(recv_buffer[i]>>8), " "));
+	}
+	f_write(file, "\"\n");
+	f_write(file, "\tstyle=\"fill:none;stroke:blue;stroke-width:2\" />\n");
+
+	f_write(file, "</svg></body></html>");
+
+	if (f_close(file))
+		println(strjoin("Saved ", filename));
+	else
+		println("Writing SVG file failed.");
 }
 
 main()
@@ -81,6 +101,10 @@ main()
 
 	if (!fpga_initialize())
 		return;
+
+	//config_chA(ADC_AC, ADC_500mV);
+	//config_chB(ADC_AC, ADC_500mV);
+	waveout_digital(1000000);
 
 	draw_menubar("FILL", "RST", "GET", "Exit");
 

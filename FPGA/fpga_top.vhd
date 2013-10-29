@@ -156,7 +156,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		fsmc_nrd_edge <= '1' WHEN fsmc_nrd = '1' AND fsmc_was_read_r = '1' ELSE '0';
 
 		-- Select between the ram data, and their mem size.
-		fsmc_output_data <= r_data WHEN fsmc_want_count = '0' ELSE d_count;
+		fsmc_output_data <= w_data WHEN fsmc_want_count = '0' ELSE d_count;
 
 		-- Write data on fsmc when fsmc_nrd = '0' and fsmc_ce = '1'. If not, put high impedance to read.
 		-- fsmc_db <= fsmc_output_data WHEN fsmc_was_read_r = '1' ELSE (OTHERS => 'Z');
