@@ -3,8 +3,25 @@
 
 #define FPGA_IMAGE "dso_quad.bin"
 
+new recv_buffer[4096];
+new fpga_config = 0x0001;
+
+const Prescale: {
+	PRESCALE_NC    = 0,
+	PRESCALE_X1    = 1,
+	PRESCALE_X2    = 2,
+	PRESCALE_X8    = 3,
+	PRESCALE_X32   = 4,
+	PRESCALE_X64   = 5,
+	PRESCALE_X128  = 6,
+	PRESCALE_X1024 = 7
+}
+
+new Prescale: prescale_idx = PRESCALE_X1;
+new bool: want_count;
+
 /*
- * FPGA
+ * Auxiliary functions to write an SVG file
  */
 
 new AXE_X = 20;
@@ -27,7 +44,7 @@ svg_new_axe(File: file, const name{}, width)
 	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X), ",", str(AXE_Y - 256), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
 	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X + width), ",", str(AXE_Y), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
 
-	f_write(file, strjoin("<text x=\"", str(AXE_X + 5), "\" y=\"", str(AXE_Y - 5), "\" font-family=\"Verdana\" font-size=\"20\">", name, "</text>"));
+	f_write(file, strjoin("\t<text x=\"", str(AXE_X + 5), "\" y=\"", str(AXE_Y - 5), "\" font-family=\"Verdana\" font-size=\"20\">", name, "</text>\r\n"));
 }
 
 svg_new_polyline(File: file)
@@ -45,17 +62,55 @@ svg_polyline_add_point(File: file, time, value)
 
 svg_close_polyline(File: file, const color{})
 {
-	f_write(file, strjoin("\"\r\n\tstyle=\"fill:none;stroke:", color, ";stroke-width:2\" />\r\n"));
+	f_write(file, strjoin("\" style=\"fill:none;stroke:", color, ";stroke-width:2\" />\r\n"));
 }
 
 /*
  * FPGA
  */
 
-fpga_set_config(value)
+fpga_set_want_count()
+{
+	fpga_config = fpga_config & 0xFFFE;
+	if (want_count)
+		fpga_config = fpga_config | 0x0001;
+}
+
+fpga_set_prescaler ()
+{
+	fpga_config = fpga_config & 0xFFF1;
+
+	if (prescale_idx == PRESCALE_X1) {
+		fpga_config = fpga_config | 0x0002;
+	}
+	else if (prescale_idx == PRESCALE_X2) {
+		fpga_config = fpga_config | 0x0004;
+	}
+	else if (prescale_idx == PRESCALE_X8) {
+		fpga_config = fpga_config | 0x0006;
+	}
+	else if (prescale_idx == PRESCALE_X32) {
+		fpga_config = fpga_config | 0x0008;
+	}
+	else if (prescale_idx == PRESCALE_X64) {
+		fpga_config = fpga_config | 0x000A;
+	}
+	else if (prescale_idx == PRESCALE_X128) {
+		fpga_config = fpga_config | 0x000C;
+	}
+	else if (prescale_idx == PRESCALE_X1024) {
+		fpga_config = fpga_config | 0x000E;
+	}
+}
+
+fpga_write_config ()
 {
 	new buffer[1];
-	buffer[0] = value;
+
+	fpga_set_want_count();
+	fpga_set_prescaler ()
+
+	buffer[0] = fpga_config;
 
 	fpga_write(buffer);
 }
@@ -86,12 +141,14 @@ bool: fpga_initialize()
 	fpga_config_outputs(PB0);
 	fpga_config_outputs(PB1);
 
+	prescale_idx = PRESCALE_X1;
+	want_count   = true;
+	fpga_write_config ();
+
 	fpga_reset();
 
 	return true;
 }
-
-new recv_buffer[4096];
 
 do_capture ()
 {
@@ -99,7 +156,9 @@ do_capture ()
 	new filename{14} = "WAVE%03d.SVG";
 
 	// First read the amount of available data
-	fpga_set_config(0x0003);
+	want_count = true;
+	fpga_write_config ();
+
 	fpga_read (recv_buffer, 1);
 	new count = recv_buffer[0];
 
@@ -118,7 +177,9 @@ do_capture ()
 	new File: file = f_open(filename, FA_WRITE | FA_CREATE_ALWAYS);
 
 	// Get the data into our buffer
-	fpga_set_config (0x0002);
+	want_count = false;
+	fpga_write_config ();
+
 	fpga_read (recv_buffer, count);
 
 	svg_init(file);
@@ -141,6 +202,10 @@ do_capture ()
 		println(strjoin("Saved ", filename));
 	else
 		println("Writing SVG file failed.");
+
+	prescale_idx++;
+	if (prescale_idx > PRESCALE_X1024)
+		prescale_idx = PRESCALE_X1;
 }
 
 main()
