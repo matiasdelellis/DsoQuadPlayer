@@ -99,7 +99,7 @@ do_capture ()
 	new filename{14} = "WAVE%03d.SVG";
 
 	// First read the amount of available data
-	fpga_set_config(0x0001);
+	fpga_set_config(0x0003);
 	fpga_read (recv_buffer, 1);
 	new count = recv_buffer[0];
 
@@ -118,7 +118,7 @@ do_capture ()
 	new File: file = f_open(filename, FA_WRITE | FA_CREATE_ALWAYS);
 
 	// Get the data into our buffer
-	fpga_set_config (0x0000);
+	fpga_set_config (0x0002);
 	fpga_read (recv_buffer, count);
 
 	svg_init(file);
@@ -152,7 +152,7 @@ main()
 
 	config_chA(ADC_DC, ADC_500mV);
 	config_chB(ADC_DC, ADC_500mV);
-	waveout_digital(720000);
+	waveout_digital(72000);
 
 	draw_menubar("FILL", "RST", "GET", "Exit");
 

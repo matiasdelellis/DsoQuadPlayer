@@ -4,6 +4,7 @@
 
 LIBRARY ieee;
 USE ieee.std_logic_1164.all;
+USE ieee.std_logic_unsigned.all;
 USE ieee.numeric_std.all;
 
 ENTITY dso_quad_top IS
@@ -43,6 +44,11 @@ ENTITY dso_quad_top IS
 END dso_quad_top;
 
 ARCHITECTURE Behavior OF dso_quad_top IS
+	-- Prescaler to write memory.
+	SIGNAL prescale         : STD_LOGIC_VECTOR(2 downto 0);
+	signal prescaler_count  : STD_LOGIC_VECTOR(10 downto 0);
+	signal new_clock        : STD_LOGIC;
+
 	-- FSMC Bus
 	SIGNAL fsmc_want_count  : STD_LOGIC;
 
@@ -60,7 +66,50 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 	SIGNAL d_count          : STD_LOGIC_VECTOR(15 downto 0);
 
 	BEGIN
-		--------------------------------
+		-----------------------------------
+		-- Settings process reading FSMC --
+		-----------------------------------
+		-- Micro write Bus on clock when fsmc_ce = '1' AND fsmc_nwr = '0'
+		PROCESS (clk, rst_n)
+		BEGIN
+			IF rst_n = '0' THEN
+				fsmc_input_data <= (OTHERS => '0');
+			ELSIF rising_edge(clk) THEN
+				IF fsmc_ce = '1' AND fsmc_nwr = '0' THEN
+					fsmc_input_data <= fsmc_db;
+				END IF;
+			END IF;
+		END PROCESS;
+
+		-- Settings.
+		fsmc_want_count <= fsmc_input_data(0);
+		prescale        <= fsmc_input_data(3 DOWNTO 1);
+
+		------------------------------------
+		-- Prescaler to select samplerate --
+		------------------------------------
+ 		PROCESS (clk)
+ 		BEGIN
+			IF rising_edge(clk) THEN
+				IF rst_n = '0' THEN
+					prescaler_count <= (OTHERS => '0');
+				ELSE
+					prescaler_count <= prescaler_count + 1;
+ 				END IF;
+ 			END IF;
+		END PROCESS;
+
+		WITH prescale SELECT
+			new_clock <= '0'                 WHEN "000",  -- No clock
+			             clk                 WHEN "001",  -- System clock
+			             prescaler_count(1)  WHEN "010",  -- System clock/2
+			             prescaler_count(3)  WHEN "011",  -- System clock/8
+			             prescaler_count(5)  WHEN "100",  -- System clock/32
+			             prescaler_count(6)  WHEN "101",  -- System clock/64
+			             prescaler_count(7)  WHEN "110",  -- System clock/128
+			             prescaler_count(10) WHEN "111";  -- System clock/1024
+
+ 		--------------------------------
 		-- Chanel A and B with Memory --
 		--------------------------------
 
@@ -71,9 +120,9 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		-- Write process.
 		w_data <= chb_din & cha_din;
 
- 		PROCESS (clk)
+ 		PROCESS (new_clock)
  		BEGIN
-			IF rising_edge(clk) THEN
+			IF rising_edge(new_clock) THEN
 				IF rst_n = '0' THEN
 					w_address <= 0;
  				ELSIF PB0 = '1' THEN
@@ -98,20 +147,6 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 			END IF;
 		END PROCESS;
 		r_data <= RAM(r_address);
-
-		-- Micro write Bus on clock when fsmc_ce = '1' AND fsmc_nwr = '0'
-		-- Only used to know when micro want count or mem data.
-		PROCESS (clk, rst_n)
-		BEGIN
-			IF rst_n = '0' THEN
-				fsmc_input_data <= (OTHERS => '0');
-			ELSIF rising_edge(clk) THEN
-				IF fsmc_ce = '1' AND fsmc_nwr = '0' THEN
-					fsmc_input_data <= fsmc_db;
-				END IF;
-			END IF;
-		END PROCESS;
-		fsmc_want_count <= '1' WHEN fsmc_input_data = X"0001" ELSE '0';
 
 		-- Select between the ram data, and their mem size.
 		fsmc_output_data <= r_data WHEN fsmc_want_count = '0' ELSE d_count;
