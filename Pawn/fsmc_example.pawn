@@ -3,6 +3,55 @@
 
 #define FPGA_IMAGE "dso_quad.bin"
 
+/*
+ * FPGA
+ */
+
+new AXE_X = 20;
+new AXE_Y = 0;
+
+svg_init(File: file)
+{
+	f_write(file, "<html><body><svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\">\r\n");
+}
+
+svg_close(File: file)
+{
+	f_write(file, "</svg></body></html>");
+}
+
+svg_new_axe(File: file, const name{}, width)
+{
+	AXE_Y += 276;
+
+	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X), ",", str(AXE_Y - 256), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
+	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X + width), ",", str(AXE_Y), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
+
+	f_write(file, strjoin("<text x=\"", str(AXE_X + 5), "\" y=\"", str(AXE_Y - 5), "\" font-family=\"Verdana\" font-size=\"20\">", name, "</text>"));
+}
+
+svg_new_polyline(File: file)
+{
+	f_write(file, "\t<polyline points=\"");
+}
+
+svg_polyline_add_point(File: file, time, value)
+{
+	f_write(file, str(AXE_X + time));
+	f_write(file, ",");
+	f_write(file, str(AXE_Y - value));
+	f_write(file, " ");
+}
+
+svg_close_polyline(File: file, const color{})
+{
+	f_write(file, strjoin("\"\r\n\tstyle=\"fill:none;stroke:", color, ";stroke-width:2\" />\r\n"));
+}
+
+/*
+ * FPGA
+ */
+
 fpga_set_config(value)
 {
 	new buffer[1];
@@ -72,31 +121,21 @@ do_capture ()
 	fpga_set_config (0x0000);
 	fpga_read (recv_buffer, count);
 
-	f_write(file, "<html><body><svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\">\r\n");
-	f_write(file, "\t<polyline points=\"20,276 20,20\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n");
-	f_write(file, "\t<polyline points=\"20,276 4096,276\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n");
+	svg_init(file);
 
-	f_write(file, "\t<polyline points=\"");
-	for (i = 0; i < count; i++) {
-		f_write(file, str(20 + i));
-		f_write(file, ",");
-		f_write(file, str(276 - (recv_buffer[i] & 0x00FF)));
-		f_write(file, " ");
-	}
-	f_write(file, "\"\r\n");
-	f_write(file, "\tstyle=\"fill:none;stroke:blue;stroke-width:2\"/>\r\n");
+	svg_new_axe(file, "Channel A", count);
+	svg_new_polyline(file);
+	for (i = 0; i < count; i++)
+		svg_polyline_add_point(file, i, (recv_buffer[i] & 0x00FF));
+	svg_close_polyline(file, "blue");
 
-	f_write(file, "\t<polyline points=\"");
-	for (i = 0; i < count; i++) {
-		f_write(file, str(20 + i));
-		f_write(file, ",");
-		f_write(file, str(276 - (recv_buffer[i] >> 8)));
-		f_write(file, " ");
-	}
-	f_write(file, "\"\r\n");
-	f_write(file, "\tstyle=\"fill:none;stroke:red;stroke-width:2\" />\r\n");
+	svg_new_axe(file, "Channel B", count);
+	svg_new_polyline(file);
+	for (i = 0; i < count; i++)
+		svg_polyline_add_point(file, i, (recv_buffer[i] >> 8));
+	svg_close_polyline(file, "red");
 
-	f_write(file, "</svg></body></html>");
+	svg_close(file);
 
 	if (f_close(file))
 		println(strjoin("Saved ", filename));
@@ -111,8 +150,8 @@ main()
 	if (!fpga_initialize())
 		return;
 
-	//config_chA(ADC_AC, ADC_500mV);
-	//config_chB(ADC_AC, ADC_500mV);
+	config_chA(ADC_DC, ADC_500mV);
+	config_chB(ADC_DC, ADC_500mV);
 	waveout_digital(720000);
 
 	draw_menubar("FILL", "RST", "GET", "Exit");
