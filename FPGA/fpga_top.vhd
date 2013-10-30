@@ -11,7 +11,8 @@ ENTITY dso_quad_top IS
 	generic (ram_lenght : INTEGER := 4096);
 
 	PORT (clk:      IN     STD_LOGIC;                      -- Main clock input      -> rising edge
-	      rst_n:    IN     STD_LOGIC;                      -- FIFO status reset     -> Active high
+	      rst_n:    IN     STD_LOGIC;                      -- Master reset          -> Active low
+	      clr_n:    IN     STD_LOGIC;                      -- FIFO status reset     -> Active low
 
 	      -- Memory bus
 	      fsmc_ce:  IN     STD_LOGIC;                      -- Databus select enable -> Active high
@@ -32,8 +33,7 @@ ENTITY dso_quad_top IS
 	      chd_din:   IN    STD_LOGIC;
 
 	      -- General-purpose input/output
-	      PB0:       IN   STD_LOGIC;                       -- Fill fifo             --> Active low
-	      PB2:       OUT   STD_LOGIC;
+	      PB0:       IN    STD_LOGIC;                      -- Fill fifo             -> Active high
 	      PA2:       OUT   STD_LOGIC;
 	      PA3:       OUT   STD_LOGIC;
 	      PA5:       OUT   STD_LOGIC;
@@ -123,7 +123,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
  		PROCESS (new_clock)
  		BEGIN
 			IF rising_edge(new_clock) THEN
-				IF rst_n = '0' THEN
+				IF rst_n = '0' OR clr_n = '0' THEN
 					w_address <= 0;
  				ELSIF PB0 = '1' THEN
  					IF w_address < ram_lenght - 1 THEN
@@ -139,7 +139,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		PROCESS (fsmc_nrd)
 		BEGIN
 			IF falling_edge(fsmc_nrd) THEN
-				IF rst_n = '0' OR fsmc_want_count = '1' THEN
+				IF rst_n = '0' OR clr_n = '0' OR fsmc_want_count = '1' THEN
 					r_address <= 0;
 				ELSIF r_address < w_address THEN
 					r_address <= r_address + 1;

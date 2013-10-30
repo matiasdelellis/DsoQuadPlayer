@@ -35,6 +35,9 @@ svg_init(File: file)
 svg_close(File: file)
 {
 	f_write(file, "</svg></body></html>");
+
+	AXE_X = 20;
+	AXE_Y = 0;
 }
 
 svg_new_axe(File: file, const name{}, width)
@@ -122,6 +125,13 @@ fpga_reset()
 	fpga_set_pin (PB1);   // Clean reset
 }
 
+fpga_clear_fifo()
+{
+	fpga_clear_pin (PB2);
+	delay_ms (10);
+	fpga_set_pin (PB2);
+}
+
 bool: fpga_initialize()
 {
 	while (!f_exists(FPGA_IMAGE)) {
@@ -140,6 +150,7 @@ bool: fpga_initialize()
 
 	fpga_config_outputs(PB0);
 	fpga_config_outputs(PB1);
+	fpga_config_outputs(PB2);
 
 	prescale_idx = PRESCALE_X1;
 	want_count   = true;
@@ -202,6 +213,8 @@ do_capture ()
 		println(strjoin("Saved ", filename));
 	else
 		println("Writing SVG file failed.");
+
+	fpga_clear_fifo();
 
 	prescale_idx++;
 	if (prescale_idx > PRESCALE_X1024)

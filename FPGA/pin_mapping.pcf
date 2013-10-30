@@ -1,8 +1,8 @@
 set_io clk 15
 set_io rst_n 62
+set_io clr_n 60
 
 set_io PB0 63
-set_io PB2 60
 set_io PA2 72
 set_io PA3 71
 set_io PC4 65
