@@ -6,18 +6,22 @@
 new recv_buffer[4096];
 new fpga_config = 0x0001;
 
+new escale_distance_svg[]  = [20, 20, 20, 20, 20, 20, 20, 20];
+new escale_distance_time[] = [20, 100, 400, 1, 2, 10, 20, 100];
+static escale_units[]{}     = ["u", "u", "u", "m", "m", "m", "m", "m"];
+
 const Prescale: {
-	PRESCALE_NC    = 0,
-	PRESCALE_X1    = 1,
-	PRESCALE_X2    = 2,
-	PRESCALE_X8    = 3,
-	PRESCALE_X32   = 4,
-	PRESCALE_X64   = 5,
-	PRESCALE_X128  = 6,
-	PRESCALE_X1024 = 7
+	PRESCALE_1u   = 0,
+	PRESCALE_5u   = 1,
+	PRESCALE_20u  = 2,
+	PRESCALE_50u  = 3,
+	PRESCALE_100u = 4,
+	PRESCALE_500u = 5,
+	PRESCALE_1m   = 6,
+	PRESCALE_5m   = 7
 }
 
-new Prescale: prescale_idx = PRESCALE_X1;
+new Prescale: prescale_idx = PRESCALE_1u;
 new bool: want_count;
 
 /*
@@ -51,12 +55,15 @@ svg_new_axe(File: file, const name{}, width)
 	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X + width), ",", str(AXE_Y), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
 
 	while (scaler_x < (AXE_X + width)) {
-		scaler_x += 720;
-		mark += 10;
+		scaler_x += escale_distance_svg [prescale_idx];
+		mark += escale_distance_time [prescale_idx];
 
-		f_write(file, strjoin("\t<polyline points=\"", str(scaler_x), ",", str(AXE_Y - 4), " ", str(scaler_x), ",", str(AXE_Y + 4), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
+		f_write(file, strjoin("\t<polyline points=\"", str(scaler_x), ",", str(AXE_Y - 4), " ", str(scaler_x), ",", str(AXE_Y + 4), "\" style=\"fill:none;stroke:black;stroke-width:2\"/> "));
 
-		f_write(file, strjoin("\t<text x=\"", str(scaler_x), "\" y=\"", str(AXE_Y + 15), "\" font-family=\"Verdana\" font-size=\"12\" style=\"text-anchor: middle\">", str(mark), "u", "</text>\r\n"));
+		f_write(file, strjoin("<text x=\"", str(scaler_x), "\" y=\"", str(AXE_Y + 15), "\" "));
+		f_write(file, strjoin("font-family=\"Verdana\" font-size=\"12\" style=\"text-anchor: middle\">"));
+		f_write(file, strjoin(str(mark), escale_units[prescale_idx], "</text>\r\n"));
+
 	}
 
 	f_write(file, strjoin("\t<text x=\"", str(AXE_X + 5), "\" y=\"", str(AXE_Y - 5), "\" font-family=\"Verdana\" font-size=\"20\">", name, "</text>\r\n"));
@@ -95,25 +102,25 @@ fpga_set_prescaler ()
 {
 	fpga_config = fpga_config & 0xFFF1;
 
-	if (prescale_idx == PRESCALE_X1) {
+	if (prescale_idx == PRESCALE_5u) {
 		fpga_config = fpga_config | 0x0002;
 	}
-	else if (prescale_idx == PRESCALE_X2) {
+	else if (prescale_idx == PRESCALE_20u) {
 		fpga_config = fpga_config | 0x0004;
 	}
-	else if (prescale_idx == PRESCALE_X8) {
+	else if (prescale_idx == PRESCALE_50u) {
 		fpga_config = fpga_config | 0x0006;
 	}
-	else if (prescale_idx == PRESCALE_X32) {
+	else if (prescale_idx == PRESCALE_100u) {
 		fpga_config = fpga_config | 0x0008;
 	}
-	else if (prescale_idx == PRESCALE_X64) {
+	else if (prescale_idx == PRESCALE_500u) {
 		fpga_config = fpga_config | 0x000A;
 	}
-	else if (prescale_idx == PRESCALE_X128) {
+	else if (prescale_idx == PRESCALE_1m) {
 		fpga_config = fpga_config | 0x000C;
 	}
-	else if (prescale_idx == PRESCALE_X1024) {
+	else if (prescale_idx == PRESCALE_5m) {
 		fpga_config = fpga_config | 0x000E;
 	}
 }
@@ -166,7 +173,7 @@ bool: fpga_initialize()
 
 	fpga_reset();
 
-	prescale_idx = PRESCALE_X1;
+	prescale_idx = PRESCALE_1u;
 	want_count   = true;
 	fpga_write_config ();
 
@@ -229,8 +236,8 @@ do_capture ()
 	fpga_clear_fifo();
 
 	prescale_idx++;
-	if (prescale_idx > PRESCALE_X1024)
-		prescale_idx = PRESCALE_X1;
+	if (prescale_idx > PRESCALE_5m)
+		prescale_idx = PRESCALE_1u;
 
 	fpga_write_config ();
 }
@@ -272,7 +279,7 @@ main()
 		if (get_keys(BUTTON2)) {
 			fpga_reset();
 
-			prescale_idx = PRESCALE_X1;
+			prescale_idx = PRESCALE_1u;
 			fpga_write_config ();
 
 			println("Reset");
