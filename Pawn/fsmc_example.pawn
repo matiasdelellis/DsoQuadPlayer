@@ -42,10 +42,22 @@ svg_close(File: file)
 
 svg_new_axe(File: file, const name{}, width)
 {
+	new scaler_x = AXE_X;
+	new mark = 0;
+
 	AXE_Y += 276;
 
 	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X), ",", str(AXE_Y - 256), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
 	f_write(file, strjoin("\t<polyline points=\"", str(AXE_X), ",", str(AXE_Y), " ", str(AXE_X + width), ",", str(AXE_Y), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
+
+	while (scaler_x < (AXE_X + width)) {
+		scaler_x += 720;
+		mark += 10;
+
+		f_write(file, strjoin("\t<polyline points=\"", str(scaler_x), ",", str(AXE_Y - 4), " ", str(scaler_x), ",", str(AXE_Y + 4), "\" style=\"fill:none;stroke:black;stroke-width:2\"/>\r\n"));
+
+		f_write(file, strjoin("\t<text x=\"", str(scaler_x), "\" y=\"", str(AXE_Y + 15), "\" font-family=\"Verdana\" font-size=\"12\" style=\"text-anchor: middle\">", str(mark), "u", "</text>\r\n"));
+	}
 
 	f_write(file, strjoin("\t<text x=\"", str(AXE_X + 5), "\" y=\"", str(AXE_Y - 5), "\" font-family=\"Verdana\" font-size=\"20\">", name, "</text>\r\n"));
 }
@@ -152,11 +164,11 @@ bool: fpga_initialize()
 	fpga_config_outputs(PB1);
 	fpga_config_outputs(PB2);
 
+	fpga_reset();
+
 	prescale_idx = PRESCALE_X1;
 	want_count   = true;
 	fpga_write_config ();
-
-	fpga_reset();
 
 	return true;
 }
@@ -219,6 +231,8 @@ do_capture ()
 	prescale_idx++;
 	if (prescale_idx > PRESCALE_X1024)
 		prescale_idx = PRESCALE_X1;
+
+	fpga_write_config ();
 }
 
 main()
@@ -256,7 +270,11 @@ main()
 		}
 
 		if (get_keys(BUTTON2)) {
-			fpga_reset()
+			fpga_reset();
+
+			prescale_idx = PRESCALE_X1;
+			fpga_write_config ();
+
 			println("Reset");
 		}
 
