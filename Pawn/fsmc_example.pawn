@@ -6,9 +6,19 @@
 new recv_buffer[4096];
 new fpga_config = 0x0001;
 
-new escale_distance_svg[]  = [20, 20, 20, 20, 20, 20, 20, 20];
-new escale_distance_time[] = [20, 100, 400, 1, 2, 10, 20, 100];
-static escale_units[]{}     = ["u", "u", "u", "m", "m", "m", "m", "m"];
+new escale_distance_svg[]    = [20, 20, 20, 20, 20, 20, 20, 20];
+new escale_distance_time[]   = [20, 100, 400, 1, 2, 10, 20, 100];
+static escale_units[]{}      = ["u", "u", "u", "m", "m", "m", "m", "m"];
+
+static txt_samplerate[]{} =
+	["Sampling at 1MHz",
+	 "Sampling at 200kHz",
+	 "Sampling at 50kHz",
+	 "Sampling at 20kHz",
+	 "Sampling at 10kHz",
+	 "Sampling at 2kHz",
+	 "Sampling at 1kHz",
+	 "Sampling at 200Hz"];
 
 const Prescale: {
 	PRESCALE_1u   = 0,
@@ -67,6 +77,10 @@ svg_new_axe(File: file, const name{}, width)
 	}
 
 	f_write(file, strjoin("\t<text x=\"", str(AXE_X + 5), "\" y=\"", str(AXE_Y - 5), "\" font-family=\"Verdana\" font-size=\"20\">", name, "</text>\r\n"));
+
+	f_write(file, strjoin("\t<text x=\"", str(AXE_X + width/2), "\" y=\"", str(AXE_Y + 20)));
+	f_write(file, "\" font-family=\"Verdana\" font-size=\"20\" style=\"text-anchor: middle\">");
+	f_write(file, strjoin(txt_samplerate[prescale_idx], "</text>\r\n"));
 }
 
 svg_new_polyline(File: file)
@@ -96,6 +110,11 @@ fpga_set_want_count()
 	fpga_config = fpga_config & 0xFFFE;
 	if (want_count)
 		fpga_config = fpga_config | 0x0001;
+}
+
+fpga_debug_samplerate ()
+{
+	println (txt_samplerate[prescale_idx]);
 }
 
 fpga_set_prescaler ()
@@ -192,8 +211,7 @@ do_capture ()
 	fpga_read (recv_buffer, 1);
 	new count = recv_buffer[0];
 
-	print("Count: ");
-	println(str(count));
+	println(strjoin("Found ", str(count), " samples."));
 
 	if (!count)
 		return;
@@ -234,12 +252,6 @@ do_capture ()
 		println("Writing SVG file failed.");
 
 	fpga_clear_fifo();
-
-	prescale_idx++;
-	if (prescale_idx > PRESCALE_5m)
-		prescale_idx = PRESCALE_1u;
-
-	fpga_write_config ();
 }
 
 main()
@@ -251,9 +263,9 @@ main()
 
 	config_chA(ADC_DC, ADC_500mV);
 	config_chB(ADC_DC, ADC_500mV);
-	waveout_digital(72000);
+	waveout_digital(1000);
 
-	draw_menubar("FILL", "RST", "GET", "Exit");
+	draw_menubar("Fill", "Rst", "Save", "Exit");
 
 	println("FPGA configured successfully.");
 	println("Ready to capture channels at 72 MSps.");
@@ -264,7 +276,7 @@ main()
 				fpga_set_pin(PB0);
 				fill = true;
 
-				println("Filling");
+				println("Getting samples on FPGA");
 			}
 		}
 		else {
@@ -272,22 +284,41 @@ main()
 				fpga_clear_pin(PB0);
 				fill = false;
 
-				println("Stop Filling");
+				println("Sampling on FPGA completed");
 			}
 		}
 
 		if (get_keys(BUTTON2)) {
+			println("Resetting FPGA");
 			fpga_reset();
 
 			prescale_idx = PRESCALE_1u;
 			fpga_write_config ();
-
-			println("Reset");
+			fpga_debug_samplerate ();
 		}
 
 		if (get_keys(BUTTON3)) {
-			println ("Get");
+			println ("Saving samples on SVG file");
 			do_capture();
+		}
+
+		if (get_keys(SCROLL2_RIGHT)) {
+			prescale_idx++;
+			if (prescale_idx > PRESCALE_5m)
+				prescale_idx = PRESCALE_1u;
+			fpga_write_config ();
+			fpga_debug_samplerate ();
+
+			delay_ms(10);
+		}
+		else if (get_keys(SCROLL2_LEFT)) {
+			prescale_idx--;
+			if (prescale_idx < PRESCALE_1u)
+				prescale_idx = PRESCALE_5m;
+			fpga_write_config ();
+			fpga_debug_samplerate ();
+
+			delay_ms(10);
 		}
 	}
 }
