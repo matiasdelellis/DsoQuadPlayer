@@ -107,12 +107,13 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 			IF rising_edge(clk) THEN
 				IF rst_n = '0' THEN
 					prescaler_count <= 0;
-				ELSIF prescaler_count < prescaler_flag THEN
-					prescaler_count <= prescaler_count + 1;
 					w_enable <= '0';
-				ELSE
+				ELSIF prescaler_count = prescaler_flag THEN
 					prescaler_count <= 0;
 					w_enable <= '1';
+				ELSE
+					prescaler_count <= prescaler_count + 1;
+					w_enable <= '0';
  				END IF;
  			END IF;
 		END PROCESS;
