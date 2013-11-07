@@ -56,6 +56,9 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 	SIGNAL fsmc_output_data : STD_LOGIC_VECTOR(15 downto 0);
 	SIGNAL fsmc_input_data  : STD_LOGIC_VECTOR(15 downto 0);
 
+	SIGNAL fsmc_nrd_lached  : STD_LOGIC;
+	SIGNAL fsmc_nrd_f_edge  : STD_LOGIC;
+
 	-- Memory
 	TYPE mem_type IS ARRAY (ram_lenght - 1 DOWNTO 0) OF STD_LOGIC_VECTOR (15 downto 0);
 
@@ -141,13 +144,23 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		d_count <= STD_LOGIC_VECTOR (to_unsigned(w_address, 16));
 
 		-- Read process.
-		PROCESS (fsmc_nrd)
+		PROCESS (clk)
 		BEGIN
-			IF falling_edge(fsmc_nrd) THEN
+			IF rising_edge(clk) THEN
+				fsmc_nrd_lached <= fsmc_nrd;
+			END IF;
+		END PROCESS;
+		fsmc_nrd_f_edge <= fsmc_nrd_lached AND (NOT fsmc_nrd);
+	
+		PROCESS (clk)
+		BEGIN
+			IF rising_edge(clk) THEN
 				IF rst_n = '0' OR clr_n = '0' OR fsmc_want_count = '1' THEN
 					r_address <= 0;
-				ELSIF r_address < w_address THEN
-					r_address <= r_address + 1;
+				ELSIF fsmc_nrd_f_edge = '1' THEN
+					IF r_address < w_address THEN
+						r_address <= r_address + 1;
+					END IF;
 				END IF;
 			END IF;
 		END PROCESS;
