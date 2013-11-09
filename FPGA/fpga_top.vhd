@@ -21,10 +21,9 @@ ENTITY dso_quad_top IS
 	      fsmc_db:  INOUT  STD_LOGIC_VECTOR(15 DOWNTO 0);  -- Data bus to MCU
 
 	      -- ADC signals
-	      adc_mode:  IN    STD_LOGIC;                      -- Ignored.
-	      adc_sleep: OUT   STD_LOGIC;                      -- ADC power down        -> Active low
-	      cha_clk:   OUT   STD_LOGIC;                      -- ADC clock channek A   -> rising edge
-	      chb_clk:   OUT   STD_LOGIC;                      -- ADC clock channek B   -> rising edge
+	      adc_mode:  OUT   STD_LOGIC_VECTOR(1 DOWNTO 0);   -- ADC mode              -> "01": Normal Operation.
+	      cha_clk:   OUT   STD_LOGIC;                      -- ADC clock channel A   -> rising edge
+	      chb_clk:   OUT   STD_LOGIC;                      -- ADC clock channel B   -> rising edge
 
 	      -- Oscilloscope data inputs
 	      cha_din:   IN    STD_LOGIC_VECTOR(7 DOWNTO 0);
@@ -100,7 +99,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 			                  7200   WHEN "100", -- 100u
 			                  36000  WHEN "101", -- 500u
 			                  72000  WHEN "110", -- 1m
-			                  360000 WHEN "111"; -- 5m
+			                  360000 WHEN OTHERS; -- 5m
 
  		PROCESS (clk)
  		BEGIN
@@ -122,7 +121,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		-- Chanel A and B with Memory --
 		--------------------------------
 
-		adc_sleep <= '1';
+		adc_mode  <= "01";
 		cha_clk   <= clk;
 		chb_clk   <= clk;
 
