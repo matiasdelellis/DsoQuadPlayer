@@ -20,6 +20,14 @@ static txt_samplerate[]{} =
 	 "Sampling at 1kHz",
 	 "Sampling at 200Hz"];
 
+const DataQuerry: {
+	QUERRY_COUNT  = 0,
+	QUERRY_RAW    = 1,
+	QUERRY_PLUS   = 2,
+	QUERRY_MINUS  = 3
+}
+new querry_hex[] = [0x0003, 0x0000, 0x0001, 0x0002];
+
 const Prescale: {
 	PRESCALE_1u   = 0,
 	PRESCALE_5u   = 1,
@@ -32,7 +40,6 @@ const Prescale: {
 }
 
 new Prescale: prescale_idx = PRESCALE_1u;
-new bool: want_count;
 
 /*
  * Auxiliary functions to write an SVG file
@@ -105,11 +112,10 @@ svg_close_polyline(File: file, const color{})
  * FPGA
  */
 
-fpga_set_want_count()
+fpga_set_querry (DataQuerry: querry)
 {
-	fpga_config = fpga_config & 0xFFFE;
-	if (want_count)
-		fpga_config = fpga_config | 0x0001;
+	fpga_config &= 0xFFFC;
+	fpga_config |= querry_hex[querry];
 }
 
 fpga_debug_samplerate ()
@@ -119,28 +125,28 @@ fpga_debug_samplerate ()
 
 fpga_set_prescaler ()
 {
-	fpga_config = fpga_config & 0xFFF1;
+	fpga_config = fpga_config & 0x0003; //0000-0011
 
 	if (prescale_idx == PRESCALE_5u) {
-		fpga_config = fpga_config | 0x0002;
+		fpga_config = fpga_config | 0x0004; //0000-0100
 	}
 	else if (prescale_idx == PRESCALE_20u) {
-		fpga_config = fpga_config | 0x0004;
+		fpga_config = fpga_config | 0x0008; //0000-1000
 	}
 	else if (prescale_idx == PRESCALE_50u) {
-		fpga_config = fpga_config | 0x0006;
+		fpga_config = fpga_config | 0x000C; //0000-1100
 	}
 	else if (prescale_idx == PRESCALE_100u) {
-		fpga_config = fpga_config | 0x0008;
+		fpga_config = fpga_config | 0x0010; //0001-0000
 	}
 	else if (prescale_idx == PRESCALE_500u) {
-		fpga_config = fpga_config | 0x000A;
+		fpga_config = fpga_config | 0x0014; //0001-0100
 	}
 	else if (prescale_idx == PRESCALE_1m) {
-		fpga_config = fpga_config | 0x000C;
+		fpga_config = fpga_config | 0x0018; //0001-1000
 	}
 	else if (prescale_idx == PRESCALE_5m) {
-		fpga_config = fpga_config | 0x000E;
+		fpga_config = fpga_config | 0x001C; //0001-1100
 	}
 }
 
@@ -148,7 +154,6 @@ fpga_write_config ()
 {
 	new buffer[1];
 
-	fpga_set_want_count();
 	fpga_set_prescaler ()
 
 	buffer[0] = fpga_config;
@@ -193,7 +198,8 @@ bool: fpga_initialize()
 	fpga_reset();
 
 	prescale_idx = PRESCALE_1u;
-	want_count   = true;
+	fpga_set_querry (QUERRY_COUNT);
+
 	fpga_write_config ();
 
 	return true;
@@ -205,7 +211,7 @@ do_capture ()
 	new filename{14} = "WAVE%03d.SVG";
 
 	// First read the amount of available data
-	want_count = true;
+	fpga_set_querry (QUERRY_COUNT);
 	fpga_write_config ();
 
 	fpga_read (recv_buffer, 1);
@@ -225,7 +231,7 @@ do_capture ()
 	new File: file = f_open(filename, FA_WRITE | FA_CREATE_ALWAYS);
 
 	// Get the data into our buffer
-	want_count = false;
+	fpga_set_querry (QUERRY_RAW);
 	fpga_write_config ();
 
 	fpga_read (recv_buffer, count);

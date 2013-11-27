@@ -50,7 +50,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 	SIGNAL w_enable         : STD_LOGIC;
 
 	-- FSMC Bus
-	SIGNAL fsmc_want_count  : STD_LOGIC;
+	SIGNAL data_query       : STD_LOGIC_VECTOR(1 downto 0);
 
 	SIGNAL fsmc_output_data : STD_LOGIC_VECTOR(15 downto 0);
 	SIGNAL fsmc_input_data  : STD_LOGIC_VECTOR(15 downto 0);
@@ -64,9 +64,13 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 	SIGNAL RAM              : mem_type;
 	SIGNAL w_address        : INTEGER RANGE 0 TO ram_lenght - 1;
 	SIGNAL r_address        : INTEGER RANGE 0 TO ram_lenght - 1;
+
 	SIGNAL w_data           : STD_LOGIC_VECTOR(15 downto 0);
 	SIGNAL r_data           : STD_LOGIC_VECTOR(15 downto 0);
 	SIGNAL d_count          : STD_LOGIC_VECTOR(15 downto 0);
+
+	SIGNAL a_plus_b         : STD_LOGIC_VECTOR(15 downto 0);
+	SIGNAL a_minus_b        : STD_LOGIC_VECTOR(15 downto 0);
 
 	BEGIN
 		-----------------------------------
@@ -85,8 +89,8 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		END PROCESS;
 
 		-- Settings.
-		fsmc_want_count <= fsmc_input_data(0);
-		prescale        <= fsmc_input_data(3 DOWNTO 1);
+		data_query <= fsmc_input_data(1 DOWNTO 0);
+		prescale   <= fsmc_input_data(4 DOWNTO 2);
 
 		------------------------------------
 		-- Prescaler to select samplerate --
@@ -155,7 +159,7 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		PROCESS (clk)
 		BEGIN
 			IF rising_edge(clk) THEN
-				IF rst_n = '0' OR clr_n = '0' OR fsmc_want_count = '1' THEN
+				IF rst_n = '0' OR clr_n = '0' OR data_query = "00" THEN
 					r_address <= 0;
 				ELSIF fsmc_nrd_f_edge = '1' THEN
 					IF r_address < w_address THEN
@@ -166,8 +170,15 @@ ARCHITECTURE Behavior OF dso_quad_top IS
 		END PROCESS;
 		r_data <= RAM(r_address);
 
+		a_plus_b  <= X"00" & STD_LOGIC_VECTOR (UNSIGNED(r_data(15 DOWNTO 8)) + UNSIGNED(r_data(7 DOWNTO 0)));
+		a_minus_b <= X"00" & STD_LOGIC_VECTOR (UNSIGNED(r_data(15 DOWNTO 8)) - UNSIGNED(r_data(7 DOWNTO 0)));
+
 		-- Select between the ram data, and their mem size.
-		fsmc_output_data <= r_data WHEN fsmc_want_count = '0' ELSE d_count;
+		WITH data_query SELECT
+			fsmc_output_data <= r_data    WHEN "00",   -- Channel A Concatenated Channel B
+			                    a_plus_b  WHEN "01",   -- Channel A Plus Channel B
+			                    a_minus_b WHEN "10",   -- Channel A Minus Channel B
+			                    d_count   WHEN OTHERS; -- Memory size
 
 		-- Write data on fsmc when fsmc_nrd = '0' and fsmc_ce = '1'. If not, put high impedance to read.
 		fsmc_db <= fsmc_output_data WHEN (fsmc_nrd = '0' AND fsmc_ce = '1') ELSE (OTHERS => 'Z');
